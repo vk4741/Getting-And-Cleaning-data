@@ -1,166 +1,57 @@
-# install.packages(data.table)
-library(data.table)
+# Getting and Cleaning Data Project John Hopkins Coursera
+# Author: Vishal K
 
-# Reading in data
-outcome - data.tablefread('outcome-of-care-measures.csv')
-outcome[, (11) = lapply(.SD, as.numeric), .SDcols = (11)]
-outcome[, lapply(.SD
-                 , hist
-                 , xlab= Deaths
-                 , main = Hospital 30-Day Death (Mortality) Rates from Heart Attack
-                 , col=lightblue)
-        , .SDcols = (11)]
+# 1. Merges the training and the test sets to create one data set.
+# 2. Extracts only the measurements on the mean and standard deviation for each measurement.
+# 3. Uses descriptive activity names to name the activities in the data set
+# 4. Appropriately labels the data set with descriptive variable names.
+# 5. From the data set in step 4, creates a second, independent tidy data set with the average of each variable for each activity and each subject.
 
+# Load Packages and get the Data
+packages <- c("data.table", "reshape2")
+sapply(packages, require, character.only=TRUE, quietly=TRUE)
+path <- getwd()
+url <- "https://d396qusza40orc.cloudfront.net/getdata%2Fprojectfiles%2FUCI%20HAR%20Dataset.zip"
+download.file(url, file.path(path, "dataFiles.zip"))
+unzip(zipfile = "dataFiles.zip")
 
-Part 2 Finding the best hospital in a state (best.R)
-best - function(state, outcome) {
-  
-  # Read outcome data
-  out_dt - data.tablefread('outcome-of-care-measures.csv')
-  
-  outcome - tolower(outcome)
-  
-  # Column name is same as variable so changing it 
-  chosen_state - state 
+# Load activity labels + features
+activityLabels <- fread(file.path(path, "UCI HAR Dataset/activity_labels.txt")
+                        , col.names = c("classLabels", "activityName"))
+features <- fread(file.path(path, "UCI HAR Dataset/features.txt")
+                  , col.names = c("index", "featureNames"))
+featuresWanted <- grep("(mean|std)\\(\\)", features[, featureNames])
+measurements <- features[featuresWanted, featureNames]
+measurements <- gsub('[()]', '', measurements)
 
-  # Check that state and outcome are valid
-  if (!chosen_state %in% unique(out_dt[[State]])) {
-    stop('invalid state')
-  }
-  
-  if (!outcome %in% c(heart attack, heart failure, pneumonia)) {
-    stop('invalid outcome')
-  }
-  
-  # Renaming Columns to be less verbose and lowercase
-  setnames(out_dt
-           , tolower(sapply(colnames(out_dt), gsub, pattern = ^Hospital 30-Day Death (Mortality) Rates from , replacement =  ))
-  )
-  
-  #Filter by state
-  out_dt - out_dt[state == chosen_state]
-  
-  # Columns indices to keep
-  col_indices - grep(paste0(hospital namestate^,outcome), colnames(out_dt))
-  
-  # Filtering out unnessecary data 
-  out_dt - out_dt[, .SD ,.SDcols = col_indices]
-  
-  # Find out what class each column is 
-  # sapply(out_dt,class)
-  out_dt[, outcome] - out_dt[,  as.numeric(get(outcome))]
-  
-  
-  # Removing Missing Values for numerical datatype (outcome column)
-  out_dt - out_dt[complete.cases(out_dt),]
-  
-  # Order Column to Top 
-  out_dt - out_dt[order(get(outcome), `hospital name`)]
-  
-  return(out_dt[, hospital name][1])
+# Load train datasets
+train <- fread(file.path(path, "UCI HAR Dataset/train/X_train.txt"))[, featuresWanted, with = FALSE]
+data.table::setnames(train, colnames(train), measurements)
+trainActivities <- fread(file.path(path, "UCI HAR Dataset/train/Y_train.txt")
+                       , col.names = c("Activity"))
+trainSubjects <- fread(file.path(path, "UCI HAR Dataset/train/subject_train.txt")
+                       , col.names = c("SubjectNum"))
+train <- cbind(trainSubjects, trainActivities, train)
 
-}
-Part 3 Ranking hospitals by outcome in a state (rankhospital.R)
-rankhospital - function(state, outcome, num = best) {
-  
-  # Read outcome data
-  out_dt - data.tablefread('outcome-of-care-measures.csv')
-  
-  outcome - tolower(outcome)
-  
-  # Column name is same as variable so changing it 
-  chosen_state - state 
-  
-  # Check that state and outcome are valid
-  if (!chosen_state %in% unique(out_dt[[State]])) {
-    stop('invalid state')
-  }
-  
-  if (!outcome %in% c(heart attack, heart failure, pneumonia)) {
-    stop('invalid outcome')
-  }
-  
-  # Renaming Columns to be less verbose and lowercase
-  setnames(out_dt
-           , tolower(sapply(colnames(out_dt), gsub, pattern = ^Hospital 30-Day Death (Mortality) Rates from , replacement =  ))
-  )
-  
-  #Filter by state
-  out_dt - out_dt[state == chosen_state]
-  
-  # Columns indices to keep
-  col_indices - grep(paste0(hospital namestate^,outcome), colnames(out_dt))
-  
-  # Filtering out unnessecary data 
-  out_dt - out_dt[, .SD ,.SDcols = col_indices]
-  
-  # Find out what class each column is 
-  # sapply(out_dt,class)
-  out_dt[, outcome] - out_dt[,  as.numeric(get(outcome))]
-  
-  
-  # Removing Missing Values for numerical datatype (outcome column)
-  out_dt - out_dt[complete.cases(out_dt),]
-  
-  # Order Column to Top 
-  out_dt - out_dt[order(get(outcome), `hospital name`)]
-  
-  out_dt - out_dt[,  .(`hospital name` = `hospital name`, state = state, rate = get(outcome), Rank = .I)]
-  
-  if (num == best){
-    return(out_dt[1,`hospital name`])
-  }
-  
-  if (num == worst){
-    return(out_dt[.N,`hospital name`])
-  }
-  
-  return(out_dt[num,`hospital name`])
+# Load test datasets
+test <- fread(file.path(path, "UCI HAR Dataset/test/X_test.txt"))[, featuresWanted, with = FALSE]
+data.table::setnames(test, colnames(test), measurements)
+testActivities <- fread(file.path(path, "UCI HAR Dataset/test/Y_test.txt")
+                        , col.names = c("Activity"))
+testSubjects <- fread(file.path(path, "UCI HAR Dataset/test/subject_test.txt")
+                      , col.names = c("SubjectNum"))
+test <- cbind(testSubjects, testActivities, test)
 
-}
-Part 4 Ranking hospitals in all states (rankall.R)
-rankall - function(outcome, num = best) {
-  
-  # Read outcome data
-  out_dt - data.tablefread('outcome-of-care-measures.csv')
-  
-  outcome - tolower(outcome)
-  
-  if (!outcome %in% c(heart attack, heart failure, pneumonia)) {
-    stop('invalid outcome')
-  }
-  
-  # Renaming Columns to be less verbose and lowercase
-  setnames(out_dt
-           , tolower(sapply(colnames(out_dt), gsub, pattern = ^Hospital 30-Day Death (Mortality) Rates from , replacement =  ))
-  )
-  
-  # Columns indices to keep
-  col_indices - grep(paste0(hospital namestate^,outcome), colnames(out_dt))
-  
-  # Filtering out unnessecary data 
-  out_dt - out_dt[, .SD ,.SDcols = col_indices]
-  
-  # Find out what class each column is 
-  # sapply(out_dt,class)
-  
-  # Change outcome column class
-  out_dt[, outcome] - out_dt[,  as.numeric(get(outcome))]
-  
-  if (num == best){
-    return(out_dt[order(state, get(outcome), `hospital name`)
-    , .(hospital = head(`hospital name`, 1))
-    , by = state])
-  }
-  
-  if (num == worst){
-    return(out_dt[order(get(outcome), `hospital name`)
-    , .(hospital = tail(`hospital name`, 1))
-    , by = state])
-  }
-  
-  return(out_dt[order(state, get(outcome), `hospital name`)
-                , head(.SD,num)
-                , by = state, .SDcols = c(hospital name) ])
-  
-}
+# merge datasets
+combined <- rbind(train, test)
+
+# Convert classLabels to activityName basically. More explicit. 
+combined[["Activity"]] <- factor(combined[, Activity]
+                              , levels = activityLabels[["classLabels"]]
+                              , labels = activityLabels[["activityName"]])
+
+combined[["SubjectNum"]] <- as.factor(combined[, SubjectNum])
+combined <- reshape2::melt(data = combined, id = c("SubjectNum", "Activity"))
+combined <- reshape2::dcast(data = combined, SubjectNum + Activity ~ variable, fun.aggregate = mean)
+
+data.table::fwrite(x = combined, file = "tidyData.txt", quote = FALSE)
